@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="ClientENet.cpp" />
+    <ClCompile Include="HostENet.cpp" />
+    <ClCompile Include="PacketENet.cpp" />
+    <ClCompile Include="PeerENet.cpp" />
+    <ClCompile Include="ServerENet.cpp" />
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="Serializable.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ClientENet.h" />
+    <ClInclude Include="HostENet.h" />
+    <ClInclude Include="PacketENet.h" />
+    <ClInclude Include="PeerENet.h" />
+    <ClInclude Include="ServerENet.h" />
+    <ClInclude Include="Buffer.h" />
+    <ClInclude Include="Serializable.h" />
+    <ClInclude Include="Random.h" />
+  </ItemGroup>
+</Project>

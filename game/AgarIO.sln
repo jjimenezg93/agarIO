@@ -1,0 +1,72 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B883E26B-419F-4772-B95E-414A98ED5077} = {B883E26B-419F-4772-B95E-414A98ED5077}
+		{39888074-6239-497A-8154-9E2022F26C22} = {39888074-6239-497A-8154-9E2022F26C22}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "enet", "..\enet-2.0\enet.vcxproj", "{75367C11-E3C2-439F-8F85-01D2A6735BD0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EnetWrapper", "EnetWrapper\EnetWrapper.vcxproj", "{39888074-6239-497A-8154-9E2022F26C22}"
+	ProjectSection(ProjectDependencies) = postProject
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0} = {75367C11-E3C2-439F-8F85-01D2A6735BD0}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "u-gine", "U-gine\vc2013\u-gine.vcxproj", "{88864902-00CE-4236-B768-D7B8CA6A4D82}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B883E26B-419F-4772-B95E-414A98ED5077} = {B883E26B-419F-4772-B95E-414A98ED5077}
+		{39888074-6239-497A-8154-9E2022F26C22} = {39888074-6239-497A-8154-9E2022F26C22}
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77} = {58688CD2-F774-4BCC-81FA-4E9BF4F02D77}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AgarIO_common", "AgarIO_common\AgarIO_common.vcxproj", "{B883E26B-419F-4772-B95E-414A98ED5077}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Debug|Win32.ActiveCfg = Debug|Win32
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Debug|Win32.Build.0 = Debug|Win32
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Debug|x64.ActiveCfg = Debug|Win32
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Release|Win32.ActiveCfg = Release|Win32
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Release|Win32.Build.0 = Release|Win32
+		{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}.Release|x64.ActiveCfg = Release|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Debug|Win32.Build.0 = Debug|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Debug|x64.ActiveCfg = Debug|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Release|Win32.ActiveCfg = Release|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Release|Win32.Build.0 = Release|Win32
+		{75367C11-E3C2-439F-8F85-01D2A6735BD0}.Release|x64.ActiveCfg = Release|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Debug|Win32.ActiveCfg = Debug|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Debug|Win32.Build.0 = Debug|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Debug|x64.ActiveCfg = Debug|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Release|Win32.ActiveCfg = Release|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Release|Win32.Build.0 = Release|Win32
+		{39888074-6239-497A-8154-9E2022F26C22}.Release|x64.ActiveCfg = Release|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Debug|Win32.ActiveCfg = Debug|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Debug|Win32.Build.0 = Debug|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Debug|x64.ActiveCfg = Debug|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Release|Win32.ActiveCfg = Release|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Release|Win32.Build.0 = Release|Win32
+		{88864902-00CE-4236-B768-D7B8CA6A4D82}.Release|x64.ActiveCfg = Release|Win32
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Debug|Win32.ActiveCfg = Debug|Win32
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Debug|Win32.Build.0 = Debug|Win32
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Debug|x64.ActiveCfg = Debug|x64
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Debug|x64.Build.0 = Debug|x64
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Release|Win32.ActiveCfg = Release|Win32
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Release|Win32.Build.0 = Release|Win32
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Release|x64.ActiveCfg = Release|x64
+		{B883E26B-419F-4772-B95E-414A98ED5077}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
