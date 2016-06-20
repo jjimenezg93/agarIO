@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{58688CD2-F774-4BCC-81FA-4E9BF4F02D77}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -24,6 +24,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "u-gine", "U-gine\vc2013\u-g
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AgarIO_common", "AgarIO_common\AgarIO_common.vcxproj", "{B883E26B-419F-4772-B95E-414A98ED5077}"
+	ProjectSection(ProjectDependencies) = postProject
+		{39888074-6239-497A-8154-9E2022F26C22} = {39888074-6239-497A-8154-9E2022F26C22}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
