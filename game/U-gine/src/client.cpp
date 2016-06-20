@@ -7,80 +7,90 @@
 
 #include "../include/u-gine.h"
 #include "ClientENet.h"
+#include "PacketENet.h"
 #include "Random.h"
 #include "Buffer.h"
 #include "Serializable.h"
 #include "pthread.h"
-#include "Entity.h"
+//AgarIO_common
+#include "entity.h"
+#include "serialize.h"
 
-float genRandomF(double min, double max) {
-	return ((float(rand()) / float(RAND_MAX)) * (max - min) + min);
+ENet::CClienteENet *pClient;
+pthread_mutex_t mutexClient = PTHREAD_MUTEX_INITIALIZER;
+
+std::vector<ENet::CPacketENet *> gIncomingPackets;
+pthread_mutex_t mutexPackets = PTHREAD_MUTEX_INITIALIZER;
+
+std::vector<aioc::Entity *> gEntities;
+
+void DrawEntities() {
+	std::vector<aioc::Entity *>::iterator entIt = gEntities.begin();
+	while (entIt != gEntities.end()) {
+		Renderer::Instance().DrawEllipse((*entIt)->GetX(), (*entIt)->GetY(),
+			(*entIt)->GetRadius(), (*entIt)->GetRadius());
+		++entIt;
+	}
+}
+
+void * UpdaterThread(void *) {
+	while (1) {
+		pthread_mutex_lock(&mutexClient);
+		pClient->Service(gIncomingPackets, 0);
+		pthread_mutex_unlock(&mutexClient);
+	}
+	return 0;
 }
 
 int main(int argc, char* argv[]) {
+	//U-gine conf
 	Screen::Instance().Open(800, 600, false);
+	Renderer::Instance().SetBlendMode(Renderer::BlendMode::SOLID);
 
-	ENet::CClienteENet *pClient = new ENet::CClienteENet();
+	pClient = new ENet::CClienteENet();
 	pClient->Init();
 
 	ENet::CPeerENet * pPeer = pClient->Connect("127.0.0.1", 1234, 2);
 
-	/*//IMAGES
-	Image * alienImg = ResourceManager::Instance().LoadImage("data/alien.png");
-	alienImg->SetMidHandle();
+	aioc::Entity * entity = new aioc::Entity(static_cast<enet_uint16>(50),
+		static_cast<enet_uint16>(50), static_cast<enet_uint16>(16));
+	gEntities.push_back(entity);
 
-	CollisionPixelData * alienColData = ResourceManager::Instance().LoadCollisionPixelData("data/aliencol.png");
-
-	Map * map = new Map(String("data/map.tmx"));
-
-	MapScene * mainScene = new MapScene(map);
-
-	Sprite * alienSprite = mainScene->CreateSprite(alienImg);
-	alienSprite->SetPosition(alienSprite->GetImage()->GetWidth() / 2, alienSprite->GetImage()->GetHeight() / 2);
-	alienSprite->SetCollisionPixelData(alienColData);
-	alienSprite->SetCollision(Sprite::CollisionMode::COLLISION_PIXEL);
-	(mainScene->GetCamera()).SetBounds(0, 0, map->GetWidth(), map->GetHeight());
-	(mainScene->GetCamera()).FollowSprite(alienSprite);*/
 
 	enet_uint16 intToSend;
 	CBuffer buffer;
 	CRandom randInt;
 
+	//aioc::SerializeSnapshot(buffer, gEntities);
+
+	pthread_t tUpdater;
+	pthread_create(&tUpdater, nullptr, UpdaterThread, nullptr);
+
 	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
 		Renderer::Instance().Clear();
 
-		std::vector<ENet::CPacketENet *> incomingPackets;
-		pClient->Service(incomingPackets, 0);
-
-		std::vector<ENet::CPacketENet *>::iterator delItr = incomingPackets.begin();
-		std::vector<ENet::CPacketENet *>::iterator itr = incomingPackets.begin();
-		while (itr != incomingPackets.end()) {
+		std::vector<ENet::CPacketENet *>::iterator delItr = gIncomingPackets.begin();
+		std::vector<ENet::CPacketENet *>::iterator itr = gIncomingPackets.begin();
+		while (itr != gIncomingPackets.end()) {
 			printf_s("Received a packet\n");
 			delete *itr;
-			itr = incomingPackets.erase(itr);
+			itr = gIncomingPackets.erase(itr);
 		}
-
 		
 		intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
 		buffer.Clear();
 		buffer.Write(&intToSend, sizeof(intToSend));
 		pClient->SendData(pPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
 
-		Sleep(100);
-		/*
-		if (Screen::Instance().MouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
-			alienSprite->MoveTo(Screen::Instance().GetMouseX() + (mainScene->GetCamera()).GetX(), Screen::Instance().GetMouseY() + (mainScene->GetCamera()).GetY(), 200);
-		}
+		DrawEntities();
 
-		mainScene->Update(Screen::Instance().ElapsedTime());
-		mainScene->Render();
-		*/
+		Sleep(100);
+		
 		Screen::Instance().Refresh();
 	}
 
 	pClient->Disconnect(pPeer);
-	/*delete mainScene;
-	delete map;*/
+
 	ResourceManager::Instance().FreeResources();
 
 	return 0;

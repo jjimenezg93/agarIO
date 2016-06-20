@@ -149,10 +149,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="entity.cpp" />
+    <ClCompile Include="serialize.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Entity.h" />
+    <ClInclude Include="defs.h" />
+    <ClInclude Include="entity.h" />
+    <ClInclude Include="serialize.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

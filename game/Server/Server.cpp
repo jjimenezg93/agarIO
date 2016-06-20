@@ -3,24 +3,21 @@
 #include "Buffer.h"
 #include "Serializable.h"
 #include "pthread.h"
-#include "Entity.h"
+//AgarIO_common
+#include "defs.h"
+#include "entity.h"
+#include "serialize.h"
 
-#define C_INITIAL_PICKABLES 0
-#define C_SPAWN_PICKABLES 1
-#define C_PLAYERS_SNAPSHOT 2
-
-using namespace ENet;
-
-CServerENet * pServer;
+ENet::CServerENet * pServer;
 pthread_mutex_t mutexServer = PTHREAD_MUTEX_INITIALIZER;
 
-std::vector<Entity *> gPickables;
+std::vector<aioc::Entity *> gPickables;
 pthread_mutex_t mutexPickables = PTHREAD_MUTEX_INITIALIZER;
 
-std::vector<Entity *> gPlayers;
+std::vector<aioc::Entity *> gPlayers;
 pthread_mutex_t mutexPlayers = PTHREAD_MUTEX_INITIALIZER;
 
-std::vector<CPacketENet *> gIncomingPackets;
+std::vector<ENet::CPacketENet *> gIncomingPackets;
 pthread_mutex_t mutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
 bool gMatchActive = true;
@@ -34,57 +31,40 @@ bool IsMatchActive() {
 	return ret;
 }
 
-/*void * network_Updater(void * socketHandle) {
-	while (1) {
-		pthread_mutex_lock(&mutexServer);
-		pServer->Service(gIncomingPackets, 0);
-		pthread_mutex_unlock(&mutexServer);
+//in another thread to have a sleep of 100ms
+void * CreateSnapshot(void * data) {
+	CBuffer buf;
+	enet_uint16 snapshotDelay;
+	while (IsMatchActive()) {
+		snapshotDelay = *(reinterpret_cast<enet_uint16 *>(data));
+		pthread_mutex_lock(&mutexPlayers);
+		if (!aioc::SerializeSnapshot(buf, gPlayers)) {
+			//std::vector<ENet::CPeerENet *>::iterator pItr = pServer->GetPeers();
+			//packet = new CPacketENet(ENet::EPacketType::DATA, &buf, buf.GetSize(), (*pItr), 0);
+		}
+		pthread_mutex_unlock(&mutexPlayers);
+		Sleep(snapshotDelay);
 	}
 	return 0;
-}*/
-
-CPacketENet * CreateSnapshot() {
-	CPacketENet * packet = nullptr;
-	/*CBuffer buf;
-	enet_uint8 command, numPlayers, radius;
-	enet_uint16 posX, posY;
-	command = static_cast<enet_uint8>(C_PLAYERS_SNAPSHOT);
-	buf.Write(&command, sizeof(command));
-	pthread_mutex_lock(&mutexPlayers);
-	numPlayers = gPlayers.size();
-	buf.Write(&numPlayers, sizeof(numPlayers));
-	std::vector<Entity *>::iterator eItr = gPlayers.begin();
-	while (eItr != gPlayers.end()) {
-		posX = (*eItr)->m_posX;
-		posY = (*eItr)->m_posY;
-		radius = (*eItr)->m_radius;
-		buf.Write(&posX, sizeof(posX));
-		buf.Write(&posY, sizeof(posY));
-		buf.Write(&radius, sizeof(radius));
-	}
-	pthread_mutex_unlock(&mutexPlayers);
-	pthread_mutex_lock(&mutexServer);
-	std::vector<CPeerENet *>::iterator pItr = pServer->GetPeers();
-	//packet = new CPacketENet(ENet::EPacketType::DATA, &buf, buf.GetSize(), (*pItr), 0);
-	pthread_mutex_unlock(&mutexServer);*/
-	return packet;
 }
 
 int _tmain(int argc, _TCHAR* argv[]) {
 	pthread_mutex_lock(&mutexServer);
-	pServer = new CServerENet();
+	pServer = new ENet::CServerENet();
 	if (pServer->Init(1234, 5)) {
 		pthread_mutex_unlock(&mutexServer);
-		pthread_t networkUpdaterThread;
-		//pthread_create(&networkUpdaterThread, nullptr, network_Updater, nullptr);
+		pthread_t snapshotUpdater;
+		enet_uint16 snapshotsDelay = 300;
+		pthread_create(&snapshotUpdater, nullptr,
+			CreateSnapshot, reinterpret_cast<void *>(&snapshotsDelay));
 		enet_uint16 intReceived = 0;
-		std::vector<CPacketENet *>::iterator itrDel;
+		std::vector<ENet::CPacketENet *>::iterator itrDel;
 		CBuffer buffer;
 		while (IsMatchActive()) {
 			pServer->Service(gIncomingPackets, 0);
-			std::vector<CPacketENet *>::iterator itr = gIncomingPackets.begin();
+			std::vector<ENet::CPacketENet *>::iterator itr = gIncomingPackets.begin();
 			while (itr != gIncomingPackets.end()) {
-				if ((*itr)->GetType() == EPacketType::DATA) {
+				if ((*itr)->GetType() == ENet::EPacketType::DATA) {
 					buffer.Clear();
 					buffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
 					intReceived = *(reinterpret_cast<enet_uint16 *>(buffer.GetBytes()));
@@ -95,7 +75,6 @@ int _tmain(int argc, _TCHAR* argv[]) {
 					++itr;
 				}
 			}
-			CreateSnapshot();
 			Sleep(100);
 		}
 	} else {
