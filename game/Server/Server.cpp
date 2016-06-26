@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <map>
 #include "ServerENet.h"
 #include "Buffer.h"
 #include "Serializable.h"
@@ -17,6 +18,9 @@ pthread_mutex_t mutexPickables = PTHREAD_MUTEX_INITIALIZER;
 std::vector<aioc::Entity *> gPlayers;
 pthread_mutex_t mutexPlayers = PTHREAD_MUTEX_INITIALIZER;
 
+std::map<enet_uint16, ENet::CPeerENet *> gPeers;
+pthread_mutex_t mutexPeers = PTHREAD_MUTEX_INITIALIZER;
+
 std::vector<ENet::CPacketENet *> gIncomingPackets;
 pthread_mutex_t mutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
@@ -31,21 +35,28 @@ bool IsMatchActive() {
 	return ret;
 }
 
-//in another thread to have a sleep of 100ms
-void * CreateSnapshot(void * data) {
+void InitFillPickables() {
+
+}
+
+void ProcessDataPacket() {
+
+}
+
+//can be handled in another thread to have some sleep
+void CreateSnapshot() {
 	CBuffer buf;
-	enet_uint16 snapshotDelay;
-	while (IsMatchActive()) {
-		snapshotDelay = *(reinterpret_cast<enet_uint16 *>(data));
-		pthread_mutex_lock(&mutexPlayers);
-		if (!aioc::SerializeSnapshot(buf, gPlayers)) {
-			//std::vector<ENet::CPeerENet *>::iterator pItr = pServer->GetPeers();
-			//packet = new CPacketENet(ENet::EPacketType::DATA, &buf, buf.GetSize(), (*pItr), 0);
+	ENet::CPacketENet * packet;
+	if (IsMatchActive() && !aioc::SerializeCommand(buf, reinterpret_cast<void *>(&gPlayers),
+		C_PLAYERS_SNAPSHOT)) {
+		std::map<enet_uint16, ENet::CPeerENet *>::iterator peersIt = gPeers.begin();
+		while (peersIt != gPeers.end()) {
+			/*packet = new ENet::CPacketENet(ENet::EPacketType::DATA, buf.GetBytes(),
+				buf.GetSize(), (*peersIt).second, 0);*/
+			pServer->SendData(peersIt->second, &buf, buf.GetSize(), 0, false);
+			++peersIt;
 		}
-		pthread_mutex_unlock(&mutexPlayers);
-		Sleep(snapshotDelay);
 	}
-	return 0;
 }
 
 int _tmain(int argc, _TCHAR* argv[]) {
@@ -53,10 +64,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	pServer = new ENet::CServerENet();
 	if (pServer->Init(1234, 5)) {
 		pthread_mutex_unlock(&mutexServer);
-		pthread_t snapshotUpdater;
 		enet_uint16 snapshotsDelay = 300;
-		pthread_create(&snapshotUpdater, nullptr,
-			CreateSnapshot, reinterpret_cast<void *>(&snapshotsDelay));
 		enet_uint16 intReceived = 0;
 		std::vector<ENet::CPacketENet *>::iterator itrDel;
 		CBuffer buffer;
@@ -67,15 +75,26 @@ int _tmain(int argc, _TCHAR* argv[]) {
 				if ((*itr)->GetType() == ENet::EPacketType::DATA) {
 					buffer.Clear();
 					buffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
+					//ProcessDataPacket();
 					intReceived = *(reinterpret_cast<enet_uint16 *>(buffer.GetBytes()));
 					printf_s("Received data %d\n", intReceived);
-					delete *itr;
-					itr = gIncomingPackets.erase(itr);
-				} else {
-					++itr;
+				} else if ((*itr)->GetType() == ENet::EPacketType::CONNECT) {
+					//add player to gPlayers and gPeers
+					pthread_mutex_lock(&mutexPlayers);
+					aioc::Entity * newPlayer = new aioc::Entity(200, 200,
+						40, aioc::EType::ET_PLAYER);
+					gPlayers.push_back(newPlayer);
+					gPeers.insert(std::pair<enet_uint16, ENet::CPeerENet *>(newPlayer->GetID(),
+						(*itr)->GetPeer()));
+					aioc::SerializeCommand(buffer, reinterpret_cast<void *>(newPlayer->GetID()),
+						C_PLAYER_CONNECTED);
+					pthread_mutex_unlock(&mutexPlayers);
 				}
+				delete *itr;
+				itr = gIncomingPackets.erase(itr);
 			}
-			Sleep(100);
+
+			CreateSnapshot();
 		}
 	} else {
 		pthread_mutex_unlock(&mutexServer);

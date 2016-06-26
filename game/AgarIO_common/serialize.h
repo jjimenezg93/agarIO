@@ -2,13 +2,16 @@
 #define _AGARIO_SERIALIZE_H
 
 #include <vector>
+#include "enet2/types.h"
 #include "Buffer.h"
+#include "PacketENet.h"
 
 namespace aioc {
 	class Entity;
 	
-	int SerializeSnapshot(CBuffer &buffer, std::vector<Entity *>& entities);
-	int DeserializeSnapshot(CBuffer &buffer);
+	int SerializeCommand(CBuffer &buffer, void * data, const enet_uint16 msgCmd);
+	int DeserializeCommand(CBuffer &buffer, ENet::CPacketENet *& packet, void * outData,
+		enet_uint8& outCmd);
 }
 
 #endif //!_AGARIO_SERIALIZE_H

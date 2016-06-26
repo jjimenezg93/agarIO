@@ -52,27 +52,29 @@ int main(int argc, char* argv[]) {
 
 	ENet::CPeerENet * pPeer = pClient->Connect("127.0.0.1", 1234, 2);
 
-	aioc::Entity * entity = new aioc::Entity(static_cast<enet_uint16>(50),
+	/*aioc::Entity * entity = new aioc::Entity(static_cast<enet_uint16>(50),
 		static_cast<enet_uint16>(50), static_cast<enet_uint16>(16));
-	gEntities.push_back(entity);
+	gEntities.push_back(entity);*/
 
 
 	enet_uint16 intToSend;
 	CBuffer buffer;
 	CRandom randInt;
 
-	//aioc::SerializeSnapshot(buffer, gEntities);
-
 	pthread_t tUpdater;
 	pthread_create(&tUpdater, nullptr, UpdaterThread, nullptr);
 
+	std::vector<ENet::CPacketENet *>::iterator delItr;
+	std::vector<ENet::CPacketENet *>::iterator itr;
+	enet_uint8 command;
 	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
 		Renderer::Instance().Clear();
 
-		std::vector<ENet::CPacketENet *>::iterator delItr = gIncomingPackets.begin();
-		std::vector<ENet::CPacketENet *>::iterator itr = gIncomingPackets.begin();
+		delItr = gIncomingPackets.begin();
+		itr = gIncomingPackets.begin();
 		while (itr != gIncomingPackets.end()) {
-			printf_s("Received a packet\n");
+			printf_s("Received a packet!!!!!!!!!!!!!\n");
+			aioc::DeserializeCommand(buffer, *itr, nullptr, command);
 			delete *itr;
 			itr = gIncomingPackets.erase(itr);
 		}
