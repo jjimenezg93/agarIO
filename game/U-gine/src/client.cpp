@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 
 
 	enet_uint16 intToSend;
-	CBuffer buffer;
+	CBuffer buffer, inBuffer, outBuffer;
 	CRandom randInt;
 
 	pthread_t tUpdater;
@@ -73,12 +73,15 @@ int main(int argc, char* argv[]) {
 		delItr = gIncomingPackets.begin();
 		itr = gIncomingPackets.begin();
 		while (itr != gIncomingPackets.end()) {
-			printf_s("Received a packet!!!!!!!!!!!!!\n");
-			aioc::DeserializeCommand(buffer, *itr, nullptr, command);
-			delete *itr;
-			itr = gIncomingPackets.erase(itr);
+			if ((*itr)->GetType() == ENet::EPacketType::DATA) {
+				printf_s("Received a packet!!!!!!!!!!!!!\n");
+				inBuffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
+				aioc::DeserializeCommand(outBuffer, inBuffer, nullptr, command);
+				delete *itr;
+				itr = gIncomingPackets.erase(itr);
+			}
 		}
-		
+
 		intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
 		buffer.Clear();
 		buffer.Write(&intToSend, sizeof(intToSend));
@@ -87,7 +90,7 @@ int main(int argc, char* argv[]) {
 		DrawEntities();
 
 		Sleep(100);
-		
+
 		Screen::Instance().Refresh();
 	}
 

@@ -52,13 +52,12 @@ namespace aioc {
 		return 0;
 	}
 
-	int DeserializeCommand(CBuffer &buffer, ENet::CPacketENet *& packet, void * outData,
+	int DeserializeCommand(CBuffer &outBuffer, CBuffer &inBuffer, void * outData,
 	enet_uint8& outCmd) {
 		enet_uint8 command;
-		CBuffer outBuf;
-		outBuf.Write(packet->GetData(), packet->GetDataLength());
 		//read first byte for command and then do a switch similar to Serialize()
-		
+		char a;
+		inBuffer.Read(&a, 1); //why this data is not the same than serialized?
 		return 0;
 	}
 }

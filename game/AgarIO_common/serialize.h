@@ -10,7 +10,7 @@ namespace aioc {
 	class Entity;
 	
 	int SerializeCommand(CBuffer &buffer, void * data, const enet_uint16 msgCmd);
-	int DeserializeCommand(CBuffer &buffer, ENet::CPacketENet *& packet, void * outData,
+	int DeserializeCommand(CBuffer &outBuffer,CBuffer &inBuffer, void * outData,
 		enet_uint8& outCmd);
 }
 
