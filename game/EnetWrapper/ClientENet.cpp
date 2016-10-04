@@ -145,7 +145,7 @@ void CClienteENet::Service(std::vector<CPacketENet*>&  incommingPackets, float d
                 break;
             case ENET_EVENT_TYPE_DISCONNECT:
                 if (DEBUG_ENET)
-                    fprintf(stdout,"Server disconected.\n");
+                    fprintf(stdout,"Server disconnected.\n");
                 pPacket = new CPacketENet(DISCONNECT, 0, 0, (CPeerENet*)Event.peer->data, 0);
                 incommingPackets.push_back(pPacket);
                 DisconnectReceived((CPeerENet*)Event.peer->data);

@@ -49,15 +49,34 @@ namespace aioc {
 			}
 			break;
 		}
+
+		CBuffer testBuf;
+		testBuf.Write(&reinterpret_cast<CBuffer &>(outBuffer), outBuffer.GetSize());
 		return 0;
 	}
 
 	int DeserializeCommand(CBuffer &outBuffer, CBuffer &inBuffer, void * outData,
 	enet_uint8& outCmd) {
-		enet_uint8 command;
 		//read first byte for command and then do a switch similar to Serialize()
-		char a;
-		inBuffer.Read(&a, 1); //why this data is not the same than serialized?
+		//outCmd = *(reinterpret_cast<enet_uint8 *>(inBuffer.GetBytes()));
+		inBuffer.GotoStart();
+		inBuffer.Read(&outCmd, 1);
+
+		switch (outCmd) {
+			case C_PLAYER_CONNECTED:
+
+				break;
+			case C_INITIAL_PICKABLES:
+
+				break;
+			case C_SPAWN_PICKABLES:
+
+				break;
+			case C_PLAYERS_SNAPSHOT:
+				outBuffer = inBuffer;
+				break;
+		}
+
 		return 0;
 	}
 }

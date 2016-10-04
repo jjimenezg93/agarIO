@@ -10,28 +10,28 @@
 #include "serialize.h"
 
 ENet::CServerENet * pServer;
-pthread_mutex_t mutexServer = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexServer = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<aioc::Entity *> gPickables;
-pthread_mutex_t mutexPickables = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexPickables = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<aioc::Entity *> gPlayers;
-pthread_mutex_t mutexPlayers = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexPlayers = PTHREAD_MUTEX_INITIALIZER;
 
 std::map<enet_uint16, ENet::CPeerENet *> gPeers;
-pthread_mutex_t mutexPeers = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexPeers = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<ENet::CPacketENet *> gIncomingPackets;
-pthread_mutex_t mutexPackets = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
 bool gMatchActive = true;
-pthread_mutex_t mutexMatch = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexMatch = PTHREAD_MUTEX_INITIALIZER;
 
 bool IsMatchActive() {
 	bool ret;
-	pthread_mutex_lock(&mutexMatch);
+	pthread_mutex_lock(&gMutexMatch);
 	ret = gMatchActive;
-	pthread_mutex_unlock(&mutexMatch);
+	pthread_mutex_unlock(&gMutexMatch);
 	return ret;
 }
 
@@ -53,17 +53,17 @@ void CreateSnapshot() {
 		while (peersIt != gPeers.end()) {
 			/*packet = new ENet::CPacketENet(ENet::EPacketType::DATA, buf.GetBytes(),
 				buf.GetSize(), (*peersIt).second, 0);*/
-			pServer->SendData(peersIt->second, &buf, buf.GetSize(), 0, false);
+			pServer->SendData(peersIt->second, buf.GetBytes(), buf.GetSize(), 0, false);
 			++peersIt;
 		}
 	}
 }
 
 int _tmain(int argc, _TCHAR* argv[]) {
-	pthread_mutex_lock(&mutexServer);
+	pthread_mutex_lock(&gMutexServer);
 	pServer = new ENet::CServerENet();
 	if (pServer->Init(1234, 5)) {
-		pthread_mutex_unlock(&mutexServer);
+		pthread_mutex_unlock(&gMutexServer);
 		enet_uint16 snapshotsDelay = 300;
 		enet_uint16 intReceived = 0;
 		std::vector<ENet::CPacketENet *>::iterator itrDel;
@@ -80,7 +80,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 					printf_s("Received data %d\n", intReceived);
 				} else if ((*itr)->GetType() == ENet::EPacketType::CONNECT) {
 					//add player to gPlayers and gPeers
-					pthread_mutex_lock(&mutexPlayers);
+					pthread_mutex_lock(&gMutexPlayers);
 					aioc::Entity * newPlayer = new aioc::Entity(200, 200,
 						40, aioc::EType::ET_PLAYER);
 					gPlayers.push_back(newPlayer);
@@ -88,16 +88,19 @@ int _tmain(int argc, _TCHAR* argv[]) {
 						(*itr)->GetPeer()));
 					aioc::SerializeCommand(buffer, reinterpret_cast<void *>(newPlayer->GetID()),
 						C_PLAYER_CONNECTED);
-					pthread_mutex_unlock(&mutexPlayers);
+					//send player connected packet to clients
+					pthread_mutex_unlock(&gMutexPlayers);
 				}
 				delete *itr;
 				itr = gIncomingPackets.erase(itr);
 			}
 
 			CreateSnapshot();
+
+			Sleep(50);
 		}
 	} else {
-		pthread_mutex_unlock(&mutexServer);
+		pthread_mutex_unlock(&gMutexServer);
 		fprintf(stdout, "Server could not be initialized.\n");
 	}
 

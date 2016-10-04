@@ -14,13 +14,16 @@
 #include "pthread.h"
 //AgarIO_common
 #include "entity.h"
+#include "defs.h"
 #include "serialize.h"
 
 ENet::CClienteENet *pClient;
-pthread_mutex_t mutexClient = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexClient = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<ENet::CPacketENet *> gIncomingPackets;
-pthread_mutex_t mutexPackets = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
+
+ENet::CPeerENet * gPeer;
 
 std::vector<aioc::Entity *> gEntities;
 
@@ -33,11 +36,59 @@ void DrawEntities() {
 	}
 }
 
+void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
+	switch (command) {
+		case C_PLAYER_CONNECTED:
+
+			break;
+		case C_INITIAL_PICKABLES:
+
+			break;
+		case C_SPAWN_PICKABLES:
+
+			break;
+		case C_PLAYERS_SNAPSHOT:
+			//read data buffer and update all players
+			break;
+	}
+}
+
 void * UpdaterThread(void *) {
+	enet_uint16 intToSend;
+	CBuffer buffer, inBuffer, outBuffer;
+	CRandom randInt;
+	std::vector<ENet::CPacketENet *>::iterator delItr;
+	std::vector<ENet::CPacketENet *>::iterator itr;
+	enet_uint8 command;
 	while (1) {
-		pthread_mutex_lock(&mutexClient);
+		/*pthread_mutex_lock(&gMutexPackets);
 		pClient->Service(gIncomingPackets, 0);
-		pthread_mutex_unlock(&mutexClient);
+		pthread_mutex_unlock(&gMutexPackets);*/
+		pthread_mutex_lock(&gMutexPackets);
+		pClient->Service(gIncomingPackets, 0);
+		delItr = gIncomingPackets.begin();
+		itr = gIncomingPackets.begin();
+		while (itr != gIncomingPackets.end()) {
+			if ((*itr)->GetType() == ENet::EPacketType::DATA) {
+				printf_s("Received a packet!!!!!!!!!!!!!\n");
+				inBuffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
+				aioc::DeserializeCommand(outBuffer, inBuffer, nullptr, command);
+				ProcessServerCommand(command, outBuffer);
+				inBuffer.Clear();
+				delete *itr;
+				itr = gIncomingPackets.erase(itr);
+			}
+		}
+		gIncomingPackets.clear();
+		pthread_mutex_unlock(&gMutexPackets);
+
+		//intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
+		intToSend = static_cast<enet_uint16>(1001);
+		buffer.Clear();
+		buffer.Write(&intToSend, sizeof(intToSend));
+		pthread_mutex_lock(&gMutexClient);
+		pClient->SendData(gPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+		pthread_mutex_unlock(&gMutexClient);
 	}
 	return 0;
 }
@@ -50,7 +101,7 @@ int main(int argc, char* argv[]) {
 	pClient = new ENet::CClienteENet();
 	pClient->Init();
 
-	ENet::CPeerENet * pPeer = pClient->Connect("127.0.0.1", 1234, 2);
+	gPeer = pClient->Connect("127.0.0.1", 1234, 2);
 
 	/*aioc::Entity * entity = new aioc::Entity(static_cast<enet_uint16>(50),
 		static_cast<enet_uint16>(50), static_cast<enet_uint16>(16));
@@ -70,6 +121,7 @@ int main(int argc, char* argv[]) {
 	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
 		Renderer::Instance().Clear();
 
+		/*pthread_mutex_lock(&gMutexPackets);
 		delItr = gIncomingPackets.begin();
 		itr = gIncomingPackets.begin();
 		while (itr != gIncomingPackets.end()) {
@@ -77,24 +129,28 @@ int main(int argc, char* argv[]) {
 				printf_s("Received a packet!!!!!!!!!!!!!\n");
 				inBuffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
 				aioc::DeserializeCommand(outBuffer, inBuffer, nullptr, command);
+				inBuffer.Clear();
 				delete *itr;
 				itr = gIncomingPackets.erase(itr);
 			}
 		}
+		pthread_mutex_unlock(&gMutexPackets);
 
 		intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
+		//intToSend = static_cast<enet_uint16>(1001);
 		buffer.Clear();
 		buffer.Write(&intToSend, sizeof(intToSend));
-		pClient->SendData(pPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+		pthread_mutex_lock(&gMutexClient);
+		pClient->SendData(gPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+		pthread_mutex_lock(&gMutexClient);*/
 
 		DrawEntities();
 
-		Sleep(100);
-
 		Screen::Instance().Refresh();
 	}
-
-	pClient->Disconnect(pPeer);
+	pthread_mutex_lock(&gMutexClient);
+	pClient->Disconnect(gPeer);
+	pthread_mutex_unlock(&gMutexClient);
 
 	ResourceManager::Instance().FreeResources();
 
