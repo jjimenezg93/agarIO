@@ -58,12 +58,29 @@ void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
 			data.Read(&numPlayers, 1);
 
 			pthread_mutex_lock(&gMutexEntities);
-			std::map<enet_uint32, aioc::Entity *>::iterator entIt = gEntities.begin();
-			pthread_mutex_unlock(&gMutexEntities);
-			for (entIt; entIt != gEntities.end(); ++entIt) {
+			std::map<enet_uint32, aioc::Entity *>::iterator entIt;
 
+			enet_uint8 radius;
+			enet_uint16 playerID, posX, posY;
+			uint16 entitiesCont = 0;
+			//IT WON'T WORK SINCE PLAYERS ARE NOT BEING CREATED CLIENT-SIDE
+			while (entitiesCont < numPlayers) {
+				data.Read(&playerID, 2);
+				data.Read(&posX, 2);
+				data.Read(&posY, 2);
+				data.Read(&radius, 1);
+
+				entIt = gEntities.find(playerID);
+
+				if (entIt != gEntities.end()) {
+					entIt->second->GetX() = posX;
+					entIt->second->GetY() = posY;
+					entIt->second->GetRadius() = radius;
+				}
+
+				++entitiesCont;
 			}
-
+			pthread_mutex_unlock(&gMutexEntities);
 			break;
 	}
 }
@@ -76,9 +93,6 @@ void * UpdaterThread(void *) {
 	std::vector<ENet::CPacketENet *>::iterator itr;
 	enet_uint8 command;
 	while (1) {
-		/*pthread_mutex_lock(&gMutexPackets);
-		pClient->Service(gIncomingPackets, 0);
-		pthread_mutex_unlock(&gMutexPackets);*/
 		pthread_mutex_lock(&gMutexPackets);
 		pClient->Service(gIncomingPackets, 0);
 		delItr = gIncomingPackets.begin();
@@ -96,14 +110,6 @@ void * UpdaterThread(void *) {
 		}
 		gIncomingPackets.clear();
 		pthread_mutex_unlock(&gMutexPackets);
-
-		/*//intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
-		intToSend = static_cast<enet_uint16>(1001);
-		buffer.Clear();
-		buffer.Write(&intToSend, sizeof(intToSend));
-		pthread_mutex_lock(&gMutexClient);
-		pClient->SendData(gPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
-		pthread_mutex_unlock(&gMutexClient);*/
 	}
 	return 0;
 }
@@ -118,11 +124,6 @@ int main(int argc, char* argv[]) {
 
 	gPeer = pClient->Connect("127.0.0.1", 1234, 2);
 
-	/*aioc::Entity * entity = new aioc::Entity(static_cast<enet_uint16>(50),
-		static_cast<enet_uint16>(50), static_cast<enet_uint16>(16));
-	gEntities.push_back(entity);*/
-
-
 	enet_uint16 intToSend;
 	CBuffer buffer, inBuffer, outBuffer;
 	CRandom randInt;
@@ -136,33 +137,11 @@ int main(int argc, char* argv[]) {
 	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
 		Renderer::Instance().Clear();
 
-		/*pthread_mutex_lock(&gMutexPackets);
-		delItr = gIncomingPackets.begin();
-		itr = gIncomingPackets.begin();
-		while (itr != gIncomingPackets.end()) {
-			if ((*itr)->GetType() == ENet::EPacketType::DATA) {
-				printf_s("Received a packet!!!!!!!!!!!!!\n");
-				inBuffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
-				aioc::DeserializeCommand(outBuffer, inBuffer, nullptr, command);
-				inBuffer.Clear();
-				delete *itr;
-				itr = gIncomingPackets.erase(itr);
-			}
-		}
-		pthread_mutex_unlock(&gMutexPackets);
-
-		intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
-		//intToSend = static_cast<enet_uint16>(1001);
-		buffer.Clear();
-		buffer.Write(&intToSend, sizeof(intToSend));
-		pthread_mutex_lock(&gMutexClient);
-		pClient->SendData(gPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
-		pthread_mutex_lock(&gMutexClient);*/
-
 		DrawEntities();
 
 		Screen::Instance().Refresh();
 	}
+
 	pthread_mutex_lock(&gMutexClient);
 	pClient->Disconnect(gPeer);
 	pthread_mutex_unlock(&gMutexClient);

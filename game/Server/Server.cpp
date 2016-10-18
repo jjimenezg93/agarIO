@@ -53,8 +53,6 @@ void SendSnapshot() {
 		C_PLAYERS_SNAPSHOT)) {
 		std::map<enet_uint32, ENet::CPeerENet *>::iterator peersIt = gPeers.begin();
 		while (peersIt != gPeers.end()) {
-			/*packet = new ENet::CPacketENet(ENet::EPacketType::DATA, buf.GetBytes(),
-				buf.GetSize(), (*peersIt).second, 0);*/
 			pServer->SendData(peersIt->second, buf.GetBytes(), buf.GetSize(), 0, false);
 			++peersIt;
 		}
@@ -115,6 +113,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 					pthread_mutex_unlock(&gMutexPeers);
 
 					if (idFound) {
+						/*
 						//remove peer from server
 						pthread_mutex_lock(&gMutexServer);
 						//std::vector<ENet::CPeerENet *>::iterator servPeerIt = pServer->GetPeers();
@@ -122,13 +121,13 @@ int _tmain(int argc, _TCHAR* argv[]) {
 							pServer->GetPeersVector().begin();
 						while (servPeerIt != pServer->GetPeersVector().end()) {
 							if ((*servPeerIt) == peerToDelete) {
-								delete *servPeerIt;
-								pServer->GetPeersVector().erase(servPeerIt);
+								//delete *servPeerIt;
+								//pServer->GetPeersVector().erase(servPeerIt);
 								break;
 							}
 							++servPeerIt;
 						}
-						pthread_mutex_unlock(&gMutexServer);
+						pthread_mutex_unlock(&gMutexServer);*/
 						//delete peer
 						pthread_mutex_lock(&gMutexPeers);
 						peerIt = gPeers.find(idToDelete);
