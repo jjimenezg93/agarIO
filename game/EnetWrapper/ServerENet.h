@@ -28,6 +28,7 @@ public:
     void    SendAll (void* data, size_t longData, int channel, bool reliable);
 
     std::vector<CPeerENet*>::iterator GetPeers() { return m_PeerList.begin(); }
+	std::vector<CPeerENet*>& GetPeersVector() { return m_PeerList; }
 };
 
 } // namespace ENet

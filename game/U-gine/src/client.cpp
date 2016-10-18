@@ -5,6 +5,8 @@
 #pragma warning(disable: 4820)
 #pragma warning(disable: 4996)
 
+#include <map>
+
 #include "../include/u-gine.h"
 #include "ClientENet.h"
 #include "PacketENet.h"
@@ -25,13 +27,15 @@ pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
 ENet::CPeerENet * gPeer;
 
-std::vector<aioc::Entity *> gEntities;
+//std::vector<aioc::Entity *> gEntities;
+std::map<enet_uint32, aioc::Entity *> gEntities;
+pthread_mutex_t gMutexEntities = PTHREAD_MUTEX_INITIALIZER;
 
 void DrawEntities() {
-	std::vector<aioc::Entity *>::iterator entIt = gEntities.begin();
+	std::map<enet_uint32, aioc::Entity *>::iterator entIt = gEntities.begin();
 	while (entIt != gEntities.end()) {
-		Renderer::Instance().DrawEllipse((*entIt)->GetX(), (*entIt)->GetY(),
-			(*entIt)->GetRadius(), (*entIt)->GetRadius());
+		Renderer::Instance().DrawEllipse((*entIt).second->GetX(), (*entIt).second->GetY(),
+			(*entIt).second->GetRadius(), (*entIt).second->GetRadius());
 		++entIt;
 	}
 }
@@ -39,7 +43,8 @@ void DrawEntities() {
 void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
 	switch (command) {
 		case C_PLAYER_CONNECTED:
-
+			//Entity * newEntity
+			//gEntities.add(newEntity);
 			break;
 		case C_INITIAL_PICKABLES:
 
@@ -49,6 +54,16 @@ void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
 			break;
 		case C_PLAYERS_SNAPSHOT:
 			//read data buffer and update all players
+			enet_uint8 numPlayers;
+			data.Read(&numPlayers, 1);
+
+			pthread_mutex_lock(&gMutexEntities);
+			std::map<enet_uint32, aioc::Entity *>::iterator entIt = gEntities.begin();
+			pthread_mutex_unlock(&gMutexEntities);
+			for (entIt; entIt != gEntities.end(); ++entIt) {
+
+			}
+
 			break;
 	}
 }
@@ -82,13 +97,13 @@ void * UpdaterThread(void *) {
 		gIncomingPackets.clear();
 		pthread_mutex_unlock(&gMutexPackets);
 
-		//intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
+		/*//intToSend = static_cast<enet_uint16>(randInt.GetRandUnsigned(0, 4000));
 		intToSend = static_cast<enet_uint16>(1001);
 		buffer.Clear();
 		buffer.Write(&intToSend, sizeof(intToSend));
 		pthread_mutex_lock(&gMutexClient);
 		pClient->SendData(gPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
-		pthread_mutex_unlock(&gMutexClient);
+		pthread_mutex_unlock(&gMutexClient);*/
 	}
 	return 0;
 }

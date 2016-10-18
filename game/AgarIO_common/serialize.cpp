@@ -1,3 +1,4 @@
+#include <map>
 #include <stdlib.h>
 #include "serialize.h"
 #include "PacketENet.h"
@@ -30,18 +31,24 @@ namespace aioc {
 		case C_PLAYERS_SNAPSHOT:
 			ENet::CPacketENet * packet = nullptr;
 			enet_uint8 numPlayers, radius;
-			enet_uint16 posX, posY;
-			std::vector<aioc::Entity *> *entities =
-				reinterpret_cast<std::vector<aioc::Entity *> *&>(data);
+			enet_uint16 playerId, posX, posY;
+			std::map<enet_uint32, aioc::Entity *> *entities =
+				reinterpret_cast<std::map<enet_uint32, aioc::Entity *> *&>(data);
+			//std::vector<aioc::Entity *> *entities =
+			//	reinterpret_cast<std::vector<aioc::Entity *> *&>(data);
 			numPlayers = entities->size();
 			if (numPlayers > 0) {
 				outBuffer.Write(&command, sizeof(command));
 				outBuffer.Write(&numPlayers, sizeof(numPlayers));
-				std::vector<aioc::Entity *>::iterator eItr = entities->begin();
+				std::map<enet_uint32, aioc::Entity *>::iterator eItr = entities->begin();
+				//std::vector<aioc::Entity *>::iterator eItr = entities->begin();
+				playerId = (*eItr).first; //ID must be copied since it's a const member
 				while (eItr != entities->end()) {
-					outBuffer.Write(&(*eItr)->GetX(), sizeof(&(*eItr)->GetX()));
-					outBuffer.Write(&(*eItr)->GetY(), sizeof(&(*eItr)->GetY()));
-					outBuffer.Write(&(*eItr)->GetRadius(), sizeof(&(*eItr)->GetRadius()));
+					outBuffer.Write(&playerId, sizeof(playerId));
+					outBuffer.Write(&(*eItr).second->GetX(), sizeof((*eItr).second->GetX()));
+					outBuffer.Write(&(*eItr).second->GetY(), sizeof((*eItr).second->GetY()));
+					outBuffer.Write(&(*eItr).second->GetRadius(),
+						sizeof((*eItr).second->GetRadius()));
 					eItr++;
 				}
 			} else {
@@ -58,7 +65,6 @@ namespace aioc {
 	int DeserializeCommand(CBuffer &outBuffer, CBuffer &inBuffer, void * outData,
 	enet_uint8& outCmd) {
 		//read first byte for command and then do a switch similar to Serialize()
-		//outCmd = *(reinterpret_cast<enet_uint8 *>(inBuffer.GetBytes()));
 		inBuffer.GotoStart();
 		inBuffer.Read(&outCmd, 1);
 
