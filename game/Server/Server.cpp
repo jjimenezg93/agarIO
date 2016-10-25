@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <map>
+#include <random>
 #include "ServerENet.h"
 #include "Buffer.h"
 #include "Serializable.h"
@@ -12,12 +13,12 @@
 ENet::CServerENet * pServer;
 pthread_mutex_t gMutexServer = PTHREAD_MUTEX_INITIALIZER;
 
-//std::vector<aioc::Entity *> gPickables;
-std::map<enet_uint32, aioc::Entity *> gPickables;
+//std::vector<aioc::CEntity *> gPickables;
+std::map<enet_uint32, aioc::CEntity *> gPickables;
 pthread_mutex_t gMutexPickables = PTHREAD_MUTEX_INITIALIZER;
 
-//std::vector<aioc::Entity *> gPlayers;
-std::map<enet_uint32, aioc::Entity *> gPlayers;
+//std::vector<aioc::CEntity *> gPlayers;
+std::map<enet_uint32, aioc::CEntity *> gPlayers;
 pthread_mutex_t gMutexPlayers = PTHREAD_MUTEX_INITIALIZER;
 
 std::map<enet_uint32, ENet::CPeerENet *> gPeers;
@@ -29,6 +30,13 @@ pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 bool gMatchActive = true;
 pthread_mutex_t gMutexMatch = PTHREAD_MUTEX_INITIALIZER;
 
+int genRandomInt(int min, int max) {
+	//return ((rand() / RAND_MAX) * (max - min) + min);
+	return rand() % (max - min) + min;
+}
+
+aioc::CEntity * gEntityForTypesSize;
+
 bool IsMatchActive() {
 	bool ret;
 	pthread_mutex_lock(&gMutexMatch);
@@ -37,7 +45,46 @@ bool IsMatchActive() {
 	return ret;
 }
 
-void InitFillPickables() {
+void InitPlayerRandomParams(CBuffer &outBuffer, decltype(gEntityForTypesSize->GetID()) id) {
+	outBuffer.Write(&id, sizeof(id));
+	
+	decltype(gEntityForTypesSize->GetX()) posX = genRandomInt(0, 200);
+	decltype(gEntityForTypesSize->GetY()) posY = genRandomInt(0, 200);
+	decltype(gEntityForTypesSize->GetRadius()) radius = genRandomInt(10, 40);
+
+	//add random color
+	
+	const std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator playerIt =
+		gPlayers.find(id);
+
+	playerIt->second->GetX_ref() = posX;
+	playerIt->second->GetY_ref() = posY;
+	playerIt->second->GetRadius_ref() = radius;
+
+	outBuffer.Write(&posX, sizeof(posX));
+	outBuffer.Write(&posY, sizeof(posY));
+	outBuffer.Write(&radius, sizeof(radius));
+}
+
+void FillInitialPickables() {
+	//add random seed generation
+	//unsigned char initialPickablesCount = genRandomInt<unsigned char>(10, 80);
+	unsigned char initialPickablesCount = INITIAL_PICKABLES_COUNT;
+	aioc::CEntity * newPickable;
+	decltype(gEntityForTypesSize->GetX()) posX;
+	decltype(gEntityForTypesSize->GetY()) posY;
+	decltype(gEntityForTypesSize->GetRadius()) radius;
+	for (unsigned char i = 0; i < initialPickablesCount; ++i) {
+		 posX = genRandomInt(0, 200);
+		 posY = genRandomInt(0, 200);
+		 radius = genRandomInt(2, 10);
+
+		newPickable = new aioc::CEntity(posX, posY, radius);
+		pthread_mutex_lock(&gMutexPickables);
+		gPickables.insert(std::pair<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>(
+			newPickable->GetID(), newPickable));
+		pthread_mutex_unlock(&gMutexPickables);
+	}
 
 }
 
@@ -51,6 +98,7 @@ void SendSnapshot() {
 	ENet::CPacketENet * packet;
 	if (IsMatchActive() && !aioc::SerializeCommand(buf, reinterpret_cast<void *>(&gPlayers),
 		C_PLAYERS_SNAPSHOT)) {
+		//better to serialize once and call SendAll()
 		std::map<enet_uint32, ENet::CPeerENet *>::iterator peersIt = gPeers.begin();
 		while (peersIt != gPeers.end()) {
 			pServer->SendData(peersIt->second, buf.GetBytes(), buf.GetSize(), 0, false);
@@ -60,10 +108,12 @@ void SendSnapshot() {
 }
 
 int _tmain(int argc, _TCHAR* argv[]) {
+	srand(time(0));
 	pthread_mutex_lock(&gMutexServer);
 	pServer = new ENet::CServerENet();
 	if (pServer->Init(1234, 5)) {
 		pthread_mutex_unlock(&gMutexServer);
+		FillInitialPickables();
 		//enet_uint16 snapshotsDelay = 300;
 		enet_uint16 intReceived = 0;
 		std::vector<ENet::CPacketENet *>::iterator itrDel;
@@ -85,16 +135,27 @@ int _tmain(int argc, _TCHAR* argv[]) {
 				} else if (packetType == ENet::EPacketType::CONNECT) {
 					//add player to gPlayers and gPeers
 					pthread_mutex_lock(&gMutexPlayers);
-					aioc::Entity * newPlayer = new aioc::Entity(200, 200,
+					aioc::CEntity * newPlayer = new aioc::CEntity(200, 200,
 						40, aioc::EType::ET_PLAYER);
 					//gPlayers.push_back(newPlayer);
-					gPlayers.insert(std::pair<enet_uint32, aioc::Entity *>(newPlayer->GetID(),
+					gPlayers.insert(std::pair<enet_uint32, aioc::CEntity *>(newPlayer->GetID(),
 						newPlayer));
 					gPeers.insert(std::pair<enet_uint16, ENet::CPeerENet *>(newPlayer->GetID(),
 						(*itr)->GetPeer()));
-					aioc::SerializeCommand(buffer, reinterpret_cast<void *>(newPlayer->GetID()),
+
+					CBuffer playerParams;
+					InitPlayerRandomParams(playerParams, newPlayer->GetID());
+
+					//DOES CLIENT NEED TO KNOW WHAT'S HIS ID? -> client will send movement command
+					//and server will update all of them, so client doesn't need to know which one
+					//they're
+					/*aioc::SerializeCommand(buffer, reinterpret_cast<void *>(&playerParams),
+						C_PLAYER_INIT_OWN);
+					pServer->SendAll(buffer.GetBytes(), buffer.GetSize(), 0, true);*/
+					aioc::SerializeCommand(buffer, reinterpret_cast<void *>(&playerParams),
 						C_PLAYER_CONNECTED);
 					//send player connected packet to clients
+					pServer->SendAll(buffer.GetBytes(), buffer.GetSize(), 0, true);
 					pthread_mutex_unlock(&gMutexPlayers);
 				} else if (packetType == ENet::EPacketType::DISCONNECT) {
 					enet_uint32 idToDelete;
@@ -139,7 +200,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 						//delete player
 						pthread_mutex_lock(&gMutexPlayers);
-						std::map<enet_uint32, aioc::Entity *>::iterator playerIt =
+						std::map<enet_uint32, aioc::CEntity *>::iterator playerIt =
 							gPlayers.find(idToDelete);
 						if (playerIt != gPlayers.end()) {
 							delete playerIt->second;

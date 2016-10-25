@@ -27,61 +27,97 @@ pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
 ENet::CPeerENet * gPeer;
 
-//std::vector<aioc::Entity *> gEntities;
-std::map<enet_uint32, aioc::Entity *> gEntities;
+//std::vector<aioc::CEntity *> gEntities;
+std::map<enet_uint32, aioc::CEntity *> gEntities;
 pthread_mutex_t gMutexEntities = PTHREAD_MUTEX_INITIALIZER;
 
+extern aioc::CEntity * gEntityForTypesSize;
+
 void DrawEntities() {
-	std::map<enet_uint32, aioc::Entity *>::iterator entIt = gEntities.begin();
+	std::map<enet_uint32, aioc::CEntity *>::iterator entIt = gEntities.begin();
 	while (entIt != gEntities.end()) {
-		Renderer::Instance().DrawEllipse((*entIt).second->GetX(), (*entIt).second->GetY(),
-			(*entIt).second->GetRadius(), (*entIt).second->GetRadius());
+		Renderer::Instance().DrawEllipse((*entIt).second->GetX(), (*entIt).second->GetY_ref(),
+			(*entIt).second->GetRadius_ref(), (*entIt).second->GetRadius_ref());
 		++entIt;
 	}
 }
 
 void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
+	aioc::CEntity * newPlayer;
+	decltype(gEntityForTypesSize->GetID()) playerID;
+	decltype(gEntityForTypesSize->GetX()) posX;
+	decltype(gEntityForTypesSize->GetY()) posY;
+	decltype(gEntityForTypesSize->GetRadius()) radius;
+
 	switch (command) {
 		case C_PLAYER_CONNECTED:
-			//Entity * newEntity
+		{
+			//CEntity * newEntity
 			//gEntities.add(newEntity);
-			break;
-		case C_INITIAL_PICKABLES:
+			//aioc::CEntity * newPlayer;
+			data.Read(&playerID, sizeof(playerID));
+			data.Read(&posX, sizeof(posX));
+			data.Read(&posY, sizeof(posY));
+			data.Read(&radius, sizeof(radius));
 
-			break;
-		case C_SPAWN_PICKABLES:
-
-			break;
-		case C_PLAYERS_SNAPSHOT:
-			//read data buffer and update all players
-			enet_uint8 numPlayers;
-			data.Read(&numPlayers, 1);
+			newPlayer = new aioc::CEntity(playerID, posX, posY, radius, aioc::ET_PLAYER);
 
 			pthread_mutex_lock(&gMutexEntities);
-			std::map<enet_uint32, aioc::Entity *>::iterator entIt;
+			gEntities.insert(std::pair<decltype(gEntityForTypesSize->GetID()),
+				aioc::CEntity *>(playerID, newPlayer));
+			pthread_mutex_unlock(&gMutexEntities);
 
-			enet_uint8 radius;
-			enet_uint16 playerID, posX, posY;
+			break;
+		}
+		case C_PLAYER_INIT_OWN: //remove?
+		{
+			//get initial position/size from server
+			break;
+		}
+		case C_INITIAL_PICKABLES:
+		{
+			break;
+		}
+		case C_SPAWN_PICKABLES:
+		{
+			break;
+		}
+		case C_PLAYERS_SNAPSHOT:
+		{
+			//read data buffer and update all players
+			pthread_mutex_lock(&gMutexEntities);
+			std::map<enet_uint32, aioc::CEntity *>::iterator entIt;
+
+			decltype(gEntityForTypesSize->GetID()) numPlayers;
+			data.Read(&numPlayers, sizeof(numPlayers));
+
 			uint16 entitiesCont = 0;
 			//IT WON'T WORK SINCE PLAYERS ARE NOT BEING CREATED CLIENT-SIDE
 			while (entitiesCont < numPlayers) {
-				data.Read(&playerID, 2);
-				data.Read(&posX, 2);
-				data.Read(&posY, 2);
-				data.Read(&radius, 1);
+				data.Read(&playerID, sizeof(playerID));
+				data.Read(&posX, sizeof(posX));
+				data.Read(&posY, sizeof(posY));
+				data.Read(&radius, sizeof(radius));
 
 				entIt = gEntities.find(playerID);
 
 				if (entIt != gEntities.end()) {
-					entIt->second->GetX() = posX;
-					entIt->second->GetY() = posY;
-					entIt->second->GetRadius() = radius;
+					entIt->second->GetX_ref() = posX;
+					entIt->second->GetY_ref() = posY;
+					entIt->second->GetRadius_ref() = radius;
+				} else {
+					//CREATE PLAYER
+					newPlayer = new aioc::CEntity(playerID, posX, posY, radius, aioc::ET_PLAYER);
+
+					gEntities.insert(std::pair<decltype(gEntityForTypesSize->GetID()),
+						aioc::CEntity *>(playerID, newPlayer));
 				}
 
 				++entitiesCont;
 			}
 			pthread_mutex_unlock(&gMutexEntities);
 			break;
+		}
 	}
 }
 
@@ -94,7 +130,7 @@ void * UpdaterThread(void *) {
 	enet_uint8 command;
 	while (1) {
 		pthread_mutex_lock(&gMutexPackets);
-		pClient->Service(gIncomingPackets, 0);
+		pClient->Service(gIncomingPackets, 0.f);
 		delItr = gIncomingPackets.begin();
 		itr = gIncomingPackets.begin();
 		while (itr != gIncomingPackets.end()) {

@@ -7,7 +7,7 @@
 #include "PacketENet.h"
 
 namespace aioc {
-	class Entity;
+	class CEntity;
 	
 	int SerializeCommand(CBuffer &buffer, void * data, const enet_uint16 msgCmd);
 	int DeserializeCommand(CBuffer &outBuffer,CBuffer &inBuffer, void * outData,
