@@ -25,7 +25,7 @@ pthread_mutex_t gMutexClient = PTHREAD_MUTEX_INITIALIZER;
 std::vector<ENet::CPacketENet *> gIncomingPackets;
 pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
-ENet::CPeerENet * gPeer;
+ENet::CPeerENet * gServerPeer;
 
 //std::vector<aioc::CEntity *> gEntities;
 std::map<enet_uint32, aioc::CEntity *> gEntities;
@@ -34,6 +34,7 @@ pthread_mutex_t gMutexEntities = PTHREAD_MUTEX_INITIALIZER;
 extern aioc::CEntity * gEntityForTypesSize;
 
 void DrawEntities() {
+	//mutex entities
 	std::map<enet_uint32, aioc::CEntity *>::iterator entIt = gEntities.begin();
 	while (entIt != gEntities.end()) {
 		Renderer::Instance().DrawEllipse((*entIt).second->GetX(), (*entIt).second->GetY_ref(),
@@ -158,10 +159,10 @@ int main(int argc, char* argv[]) {
 	pClient = new ENet::CClienteENet();
 	pClient->Init();
 
-	gPeer = pClient->Connect("127.0.0.1", 1234, 2);
+	gServerPeer = pClient->Connect("127.0.0.1", 1234, 2);
 
 	enet_uint16 intToSend;
-	CBuffer buffer, inBuffer, outBuffer;
+	CBuffer buffer;
 	CRandom randInt;
 
 	pthread_t tUpdater;
@@ -170,16 +171,51 @@ int main(int argc, char* argv[]) {
 	std::vector<ENet::CPacketENet *>::iterator delItr;
 	std::vector<ENet::CPacketENet *>::iterator itr;
 	enet_uint8 command;
+
+	double lastInputH = 0.f, lastInputV = 0.f;
+
 	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
 		Renderer::Instance().Clear();
 
+		lastInputH += Screen::Instance().ElapsedTime();
+		lastInputV += Screen::Instance().ElapsedTime();
+
 		DrawEntities();
+
+		if (lastInputH >= kClientInputMinTime) {
+			if (Screen::Instance().KeyPressed(GLFW_KEY_RIGHT)) {
+				command = C_MOVE_RIGHT;
+				buffer.Write(&command, sizeof(command));
+				pClient->SendData(gServerPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+				buffer.Clear();
+			} else if (Screen::Instance().KeyPressed(GLFW_KEY_LEFT)) {
+				command = C_MOVE_LEFT;
+				buffer.Write(&command, sizeof(command));
+				pClient->SendData(gServerPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+				buffer.Clear();
+			}
+			lastInputH = 0.f;
+		}
+		if (lastInputV >= kClientInputMinTime) {
+			if (Screen::Instance().KeyPressed(GLFW_KEY_UP)) {
+				command = C_MOVE_UP;
+				buffer.Write(&command, sizeof(command));
+				pClient->SendData(gServerPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+				buffer.Clear();
+			} else if (Screen::Instance().KeyPressed(GLFW_KEY_DOWN)) {
+				command = C_MOVE_DOWN;
+				buffer.Write(&command, sizeof(command));
+				pClient->SendData(gServerPeer, buffer.GetBytes(), buffer.GetSize(), 0, false);
+				buffer.Clear();
+			}
+			lastInputV = 0.f;
+		}
 
 		Screen::Instance().Refresh();
 	}
 
 	pthread_mutex_lock(&gMutexClient);
-	pClient->Disconnect(gPeer);
+	pClient->Disconnect(gServerPeer);
 	pthread_mutex_unlock(&gMutexClient);
 
 	ResourceManager::Instance().FreeResources();
