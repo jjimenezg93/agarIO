@@ -27,60 +27,106 @@ pthread_mutex_t gMutexPackets = PTHREAD_MUTEX_INITIALIZER;
 
 ENet::CPeerENet * gServerPeer;
 
-//std::vector<aioc::CEntity *> gEntities;
 std::map<enet_uint32, aioc::CEntity *> gEntities;
 pthread_mutex_t gMutexEntities = PTHREAD_MUTEX_INITIALIZER;
 
 extern aioc::CEntity * gEntityForTypesSize;
 
 void DrawEntities() {
-	//mutex entities
+	pthread_mutex_lock(&gMutexEntities);
 	std::map<enet_uint32, aioc::CEntity *>::iterator entIt = gEntities.begin();
 	while (entIt != gEntities.end()) {
+		Renderer::Instance().SetColor(entIt->second->GetColor().m_r, entIt->second->GetColor().m_g,
+			entIt->second->GetColor().m_b, 255);
 		Renderer::Instance().DrawEllipse((*entIt).second->GetX(), (*entIt).second->GetY_ref(),
 			(*entIt).second->GetRadius_ref(), (*entIt).second->GetRadius_ref());
 		++entIt;
 	}
+	pthread_mutex_unlock(&gMutexEntities);
 }
 
 void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
-	aioc::CEntity * newPlayer;
-	decltype(gEntityForTypesSize->GetID()) playerID;
+	aioc::CEntity * newEntity;
+	decltype(gEntityForTypesSize->GetID()) entityID;
 	decltype(gEntityForTypesSize->GetX()) posX;
 	decltype(gEntityForTypesSize->GetY()) posY;
 	decltype(gEntityForTypesSize->GetRadius()) radius;
+	decltype(gEntityForTypesSize->GetColor()) color;
 
 	switch (command) {
 		case C_PLAYER_CONNECTED:
 		{
-			//CEntity * newEntity
-			//gEntities.add(newEntity);
-			//aioc::CEntity * newPlayer;
-			data.Read(&playerID, sizeof(playerID));
+			data.Read(&entityID, sizeof(entityID));
 			data.Read(&posX, sizeof(posX));
 			data.Read(&posY, sizeof(posY));
 			data.Read(&radius, sizeof(radius));
+			data.Read(&color.m_r, sizeof(color.m_r));
+			data.Read(&color.m_g, sizeof(color.m_g));
+			data.Read(&color.m_b, sizeof(color.m_b));
 
-			newPlayer = new aioc::CEntity(playerID, posX, posY, radius, aioc::ET_PLAYER);
+			newEntity = new aioc::CEntity(entityID, posX, posY, radius, color, aioc::ET_PLAYER);
 
 			pthread_mutex_lock(&gMutexEntities);
 			gEntities.insert(std::pair<decltype(gEntityForTypesSize->GetID()),
-				aioc::CEntity *>(playerID, newPlayer));
+				aioc::CEntity *>(entityID, newEntity));
 			pthread_mutex_unlock(&gMutexEntities);
 
 			break;
 		}
-		case C_PLAYER_INIT_OWN: //remove?
+		case C_DESPAWN_ENTITY:
 		{
-			//get initial position/size from server
+			data.Read(&entityID, sizeof(entityID));
+
+			pthread_mutex_lock(&gMutexEntities);
+			std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator entIt =
+				gEntities.begin();
+			while (entIt != gEntities.end()) {
+				if (entIt->first == entityID) {
+					delete entIt->second;
+					gEntities.erase(entIt);
+					break;
+				}
+			}
+			pthread_mutex_unlock(&gMutexEntities);
+
 			break;
 		}
-		case C_INITIAL_PICKABLES:
+		case C_PICKABLES_SNAPSHOT:
 		{
-			break;
-		}
-		case C_SPAWN_PICKABLES:
-		{
+			pthread_mutex_lock(&gMutexEntities);
+			std::map<enet_uint32, aioc::CEntity *>::iterator entIt;
+
+			decltype(gEntityForTypesSize->GetID()) numPickables;
+			data.Read(&numPickables, sizeof(numPickables));
+
+			uint16 entitiesCont = 0;
+			while (entitiesCont < numPickables) {
+				data.Read(&entityID, sizeof(entityID));
+				data.Read(&posX, sizeof(posX));
+				data.Read(&posY, sizeof(posY));
+				data.Read(&radius, sizeof(radius));
+				data.Read(&color.m_r, sizeof(color.m_r));
+				data.Read(&color.m_g, sizeof(color.m_g));
+				data.Read(&color.m_b, sizeof(color.m_b));
+
+				entIt = gEntities.find(entityID);
+
+				if (entIt != gEntities.end()) {
+					entIt->second->GetX_ref() = posX;
+					entIt->second->GetY_ref() = posY;
+					entIt->second->GetRadius_ref() = radius;
+					entIt->second->SetColor(color.m_r, color.m_g, color.m_b);
+				} else {
+					newEntity = new aioc::CEntity(entityID, posX, posY, radius, color,
+						aioc::EType::ET_PICKABLE);
+
+					gEntities.insert(std::pair<decltype(gEntityForTypesSize->GetID()),
+						aioc::CEntity *>(entityID, newEntity));
+				}
+
+				++entitiesCont;
+			}
+			pthread_mutex_unlock(&gMutexEntities);
 			break;
 		}
 		case C_PLAYERS_SNAPSHOT:
@@ -93,25 +139,29 @@ void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
 			data.Read(&numPlayers, sizeof(numPlayers));
 
 			uint16 entitiesCont = 0;
-			//IT WON'T WORK SINCE PLAYERS ARE NOT BEING CREATED CLIENT-SIDE
 			while (entitiesCont < numPlayers) {
-				data.Read(&playerID, sizeof(playerID));
+				data.Read(&entityID, sizeof(entityID));
 				data.Read(&posX, sizeof(posX));
 				data.Read(&posY, sizeof(posY));
 				data.Read(&radius, sizeof(radius));
+				data.Read(&color.m_r, sizeof(color.m_r));
+				data.Read(&color.m_g, sizeof(color.m_g));
+				data.Read(&color.m_b, sizeof(color.m_b));
 
-				entIt = gEntities.find(playerID);
+				entIt = gEntities.find(entityID);
 
 				if (entIt != gEntities.end()) {
 					entIt->second->GetX_ref() = posX;
 					entIt->second->GetY_ref() = posY;
 					entIt->second->GetRadius_ref() = radius;
+					entIt->second->SetColor(color.m_r, color.m_g, color.m_b);
 				} else {
 					//CREATE PLAYER
-					newPlayer = new aioc::CEntity(playerID, posX, posY, radius, aioc::ET_PLAYER);
+					newEntity = new aioc::CEntity(entityID, posX, posY, radius, color,
+						aioc::ET_PLAYER);
 
 					gEntities.insert(std::pair<decltype(gEntityForTypesSize->GetID()),
-						aioc::CEntity *>(playerID, newPlayer));
+						aioc::CEntity *>(entityID, newEntity));
 				}
 
 				++entitiesCont;
@@ -136,11 +186,11 @@ void * UpdaterThread(void *) {
 		itr = gIncomingPackets.begin();
 		while (itr != gIncomingPackets.end()) {
 			if ((*itr)->GetType() == ENet::EPacketType::DATA) {
-				printf_s("Received a packet!!!!!!!!!!!!!\n");
 				inBuffer.Write((*itr)->GetData(), (*itr)->GetDataLength());
 				aioc::DeserializeCommand(outBuffer, inBuffer, nullptr, command);
 				ProcessServerCommand(command, outBuffer);
 				inBuffer.Clear();
+				outBuffer.Clear();
 				delete *itr;
 				itr = gIncomingPackets.erase(itr);
 			}
@@ -153,7 +203,7 @@ void * UpdaterThread(void *) {
 
 int main(int argc, char* argv[]) {
 	//U-gine conf
-	Screen::Instance().Open(800, 600, false);
+	Screen::Instance().Open(kScreenWidth, kScreenHeight, false);
 	Renderer::Instance().SetBlendMode(Renderer::BlendMode::SOLID);
 
 	pClient = new ENet::CClienteENet();
