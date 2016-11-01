@@ -11,7 +11,7 @@ namespace aioc {
 	int SerializeCommand(CBuffer &outBuffer, void * data,
 		const enet_uint16 msgCmd) {
 		outBuffer.Clear();
-		CBuffer * inBuffer = reinterpret_cast<CBuffer *&>(data);
+		CBuffer * inBuffer = reinterpret_cast<CBuffer *&>(data); //not necessarily a buffer
 
 		decltype(gEntityForTypesSize->GetID()) entityID;
 		decltype(gEntityForTypesSize->GetX()) posX;
@@ -44,9 +44,18 @@ namespace aioc {
 
 				break;
 			}
+			case C_DISCONNECT_PLAYER:
+			{
+				outBuffer.Write(&command, sizeof(command));
+
+				break;
+			}
 			case C_DESPAWN_ENTITY:
 			{
+				entityID = *(reinterpret_cast<decltype(gEntityForTypesSize->GetID()) *>(data));
 
+				outBuffer.Write(&command, sizeof(command));
+				outBuffer.Write(&entityID, sizeof(entityID));
 
 				break;
 			}

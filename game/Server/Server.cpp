@@ -77,7 +77,8 @@ void InitPlayerRandomParams(CBuffer &outBuffer, decltype(gEntityForTypesSize->Ge
 void FillInitialPickables() {
 	//add random seed generation
 	//unsigned char initialPickablesCount = genRandomInt<unsigned char>(10, 80);
-	unsigned char initialPickablesCount = genRandomInt(1, INITIAL_PICKABLES_COUNT);
+	unsigned char initialPickablesCount = genRandomInt(kMinInitialPickables,
+		kMaxInitialPickables);
 	aioc::CEntity * newPickable;
 	decltype(gEntityForTypesSize->GetX()) posX;
 	decltype(gEntityForTypesSize->GetY()) posY;
@@ -87,7 +88,7 @@ void FillInitialPickables() {
 	for (unsigned char i = 0; i < initialPickablesCount; ++i) {
 		posX = genRandomInt(0, kScreenWidth);
 		posY = genRandomInt(0, kScreenHeight);
-		radius = genRandomInt(2, 10);
+		radius = genRandomInt(kMinPickablesSize, kMaxPickablesSize);
 		color = aioc::CEntity::SColor(genRandomInt(0, 255), genRandomInt(0, 255),
 			genRandomInt(0, 255));
 
@@ -154,24 +155,14 @@ void SendSnapshot() {
 		pthread_mutex_lock(&gMutexPickables);
 		if (!aioc::SerializeCommand(pickablesBuffer, reinterpret_cast<void *>(&gPickables),
 			C_PICKABLES_SNAPSHOT)) {
-			std::map<enet_uint32, ENet::CPeerENet *>::iterator peersIt = gPeers.begin();
-			while (peersIt != gPeers.end()) {
-				pServer->SendData(peersIt->second, pickablesBuffer.GetBytes(),
-					pickablesBuffer.GetSize(), 0, false);
-				++peersIt;
-			}
+			pServer->SendAll(pickablesBuffer.GetBytes(), pickablesBuffer.GetSize(), 0, false);
 			pickablesBuffer.Clear();
 		}
 		pthread_mutex_unlock(&gMutexPickables);
 		pthread_mutex_lock(&gMutexPlayers);
 		if (!aioc::SerializeCommand(playersBuffer, reinterpret_cast<void *>(&gPlayers),
 			C_PLAYERS_SNAPSHOT)) {
-			std::map<enet_uint32, ENet::CPeerENet *>::iterator peersIt = gPeers.begin();
-			while (peersIt != gPeers.end()) {
-				pServer->SendData(peersIt->second, playersBuffer.GetBytes(),
-					playersBuffer.GetSize(), 0, false);
-				++peersIt;
-			}
+			pServer->SendAll(playersBuffer.GetBytes(), playersBuffer.GetSize(), 0, false);
 			playersBuffer.Clear();
 		}
 		pthread_mutex_unlock(&gMutexPlayers);
@@ -205,21 +196,28 @@ bool IsCollision(aioc::CEntity * et1, aioc::CEntity * et2) {
 }
 
 void CheckAndUpdateCollisions() {
-	pthread_mutex_lock(&gMutexPlayers);
-	std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator playerIt =
-		gPlayers.begin();
-	std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator entIt =
-		gPickables.begin();
+	CBuffer despawnBuffer;
 	decltype(gEntityForTypesSize->GetID()) deletionID;
+	std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator playerIt;
+	std::map<decltype(gEntityForTypesSize->GetID()), aioc::CEntity *>::iterator entIt;
+
+	pthread_mutex_lock(&gMutexPlayers);
+	pthread_mutex_lock(&gMutexPickables);
+	playerIt = gPlayers.begin();
 	while (playerIt != gPlayers.end()) {
+		entIt = gPickables.begin();
 		while (entIt != gPickables.end()) {
 			if (IsCollision(playerIt->second, entIt->second)) {
 				playerIt->second->GetRadius_ref() += entIt->second->GetRadius();
-				deletionID = playerIt->first;
+				deletionID = entIt->first;
 				delete entIt->second;
 				entIt = gPickables.erase(entIt);
 
-				//iterate over pickables and delete the one with that ID
+				aioc::SerializeCommand(despawnBuffer, reinterpret_cast<void *>(&deletionID),
+					C_DESPAWN_ENTITY);
+
+				pServer->SendAll(despawnBuffer.GetBytes(), despawnBuffer.GetSize(), 0, true);
+				despawnBuffer.Clear();
 				continue;
 			}
 			++entIt;
@@ -228,14 +226,56 @@ void CheckAndUpdateCollisions() {
 		while (entIt != gPlayers.end()) {
 			if (playerIt != entIt) {
 				if (IsCollision(playerIt->second, entIt->second)) {
-					if (playerIt->second->GetRadius() >= entIt->second->GetRadius()) {
-						/*entIt->second->SetColor(genRandomInt(0, 255), genRandomInt(0, 255),
-							genRandomInt(0, 255));*/
-						//send messages: player wins
+					if (playerIt->second->GetRadius() > entIt->second->GetRadius()) {
+						//delete from server
+						playerIt->second->GetRadius_ref() += entIt->second->GetRadius();
+						deletionID = entIt->first;
+						delete entIt->second;
+						entIt = gPlayers.erase(entIt);
+
+						aioc::SerializeCommand(despawnBuffer,
+							reinterpret_cast<void *>(&deletionID), C_DESPAWN_ENTITY);
+						pServer->SendAll(despawnBuffer.GetBytes(), despawnBuffer.GetSize(),
+							0, true);
+						despawnBuffer.Clear();
+
+						//send message to player in order to disconnect
+						aioc::SerializeCommand(despawnBuffer, nullptr, C_DISCONNECT_PLAYER);
+						std::map<decltype(gEntityForTypesSize->GetID()),
+							ENet::CPeerENet *>::iterator peerIt = gPeers.find(deletionID);
+						pthread_mutex_lock(&gMutexPeers);
+						pServer->SendData(peerIt->second,
+							despawnBuffer.GetBytes(), despawnBuffer.GetSize(), 0, true);
+						//remove peer
+						peerIt = gPeers.erase(peerIt);
+						pthread_mutex_unlock(&gMutexPeers);
+						despawnBuffer.Clear();
+						continue;
 					} else if (playerIt->second->GetRadius() < entIt->second->GetRadius()) {
-						/*pickableIt->second->SetColor(genRandomInt(0, 255), genRandomInt(0, 255),
-							genRandomInt(0, 255));*/
-						//send messages: entIt wins
+						//delete from server
+						entIt->second->GetRadius_ref() += playerIt->second->GetRadius();
+						deletionID = playerIt->first;
+						delete playerIt->second;
+						playerIt = gPlayers.erase(playerIt);
+
+						aioc::SerializeCommand(despawnBuffer,
+							reinterpret_cast<void *>(&deletionID), C_DESPAWN_ENTITY);
+						pServer->SendAll(despawnBuffer.GetBytes(), despawnBuffer.GetSize(),
+							0, true);
+						despawnBuffer.Clear();
+
+						//send message to player in order to disconnect
+						aioc::SerializeCommand(despawnBuffer, nullptr, C_DISCONNECT_PLAYER);
+						std::map<decltype(gEntityForTypesSize->GetID()),
+							ENet::CPeerENet *>::iterator peerIt = gPeers.find(deletionID);
+						pthread_mutex_lock(&gMutexPeers);
+						pServer->SendData(peerIt->second,
+							despawnBuffer.GetBytes(), despawnBuffer.GetSize(), 0, true);
+						//remove peer
+						peerIt = gPeers.erase(peerIt);
+						pthread_mutex_unlock(&gMutexPeers);
+						despawnBuffer.Clear();
+						continue;
 					}
 				}
 			}
@@ -243,6 +283,7 @@ void CheckAndUpdateCollisions() {
 		}
 		++playerIt;
 	}
+	pthread_mutex_unlock(&gMutexPickables);
 	pthread_mutex_unlock(&gMutexPlayers);
 }
 
@@ -337,7 +378,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 			CheckAndUpdateCollisions();
 			SendSnapshot();
 
-			Sleep(SNAPSHOTS_DELAY);
+			Sleep(kSnapshotsDelay);
 		}
 	} else {
 		pthread_mutex_unlock(&gMutexServer);

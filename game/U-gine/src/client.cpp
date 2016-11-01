@@ -32,6 +32,9 @@ pthread_mutex_t gMutexEntities = PTHREAD_MUTEX_INITIALIZER;
 
 extern aioc::CEntity * gEntityForTypesSize;
 
+bool gCloseScreen = false;
+pthread_mutex_t gMutexCloseScreen = PTHREAD_MUTEX_INITIALIZER;
+
 void DrawEntities() {
 	pthread_mutex_lock(&gMutexEntities);
 	std::map<enet_uint32, aioc::CEntity *>::iterator entIt = gEntities.begin();
@@ -86,9 +89,17 @@ void ProcessServerCommand(enet_uint8 command, CBuffer &data) {
 					gEntities.erase(entIt);
 					break;
 				}
+				entIt++;
 			}
 			pthread_mutex_unlock(&gMutexEntities);
 
+			break;
+		}
+		case C_DISCONNECT_PLAYER:
+		{
+			pthread_mutex_lock(&gMutexCloseScreen);
+			gCloseScreen = true;
+			pthread_mutex_unlock(&gMutexCloseScreen);
 			break;
 		}
 		case C_PICKABLES_SNAPSHOT:
@@ -224,7 +235,12 @@ int main(int argc, char* argv[]) {
 
 	double lastInputH = 0.f, lastInputV = 0.f;
 
-	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)) {
+	pthread_mutex_lock(&gMutexCloseScreen);
+	bool closeScreen = gCloseScreen;
+	pthread_mutex_unlock(&gMutexCloseScreen);
+
+	while (Screen::Instance().IsOpened() && !Screen::Instance().KeyPressed(GLFW_KEY_ESC)
+		&& !closeScreen) {
 		Renderer::Instance().Clear();
 
 		lastInputH += Screen::Instance().ElapsedTime();
@@ -260,6 +276,10 @@ int main(int argc, char* argv[]) {
 			}
 			lastInputV = 0.f;
 		}
+
+		pthread_mutex_lock(&gMutexCloseScreen);
+		closeScreen = gCloseScreen;
+		pthread_mutex_unlock(&gMutexCloseScreen);
 
 		Screen::Instance().Refresh();
 	}
